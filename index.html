@@ -4,17 +4,25 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Winter Wonderland: Christmas Hunt</title>
-    <!-- Fix Favicon 404 with a Christmas Tree Emoji -->
+    <!-- Favicon -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎄</text></svg>">
+    
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Mountains+of+Christmas:wght@400;700&family=Nunito:wght@400;600;800&display=swap" rel="stylesheet">
+    
+    <!-- Babel for in-browser TSX transpilation (Fixes MIME type errors) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
     <style>
       body {
         font-family: 'Nunito', sans-serif;
         background-color: #0f172a;
         color: white;
-        overflow: hidden; /* Prevent scrolling, app handles viewport */
-        touch-action: none; /* Prevent browser zoom/scroll on mobile */
+        overflow: hidden;
+        touch-action: none;
       }
       .font-christmas {
         font-family: 'Mountains of Christmas', cursive;
@@ -28,22 +36,723 @@
         100% { transform: translateY(0px); }
       }
     </style>
-  <script type="importmap">
+
+    <!-- Import Map -->
+    <script type="importmap">
 {
   "imports": {
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "react": "https://esm.sh/react@^19.2.3",
-    "@google/genai": "https://esm.sh/@google/genai@^1.33.0",
+    "react": "https://esm.sh/react@18.2.0",
+    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+    "@google/genai": "https://esm.sh/@google/genai@0.1.1",
+    "trystero": "https://esm.sh/trystero@0.19.0",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react-dom/client": "https://esm.sh/react-dom@^19.2.3/client",
-    "trystero": "https://esm.sh/trystero@0.19.0"
+    "react/": "https://esm.sh/react@^19.2.3/"
   }
 }
 </script>
-</head>
+  </head>
   <body>
     <div id="root"></div>
-    <!-- Load the Application Entry Point -->
-    <script type="module" src="./index.tsx"></script>
+
+    <!-- Main Application Code -->
+    <script type="text/babel" data-type="module" data-presets="react,typescript">
+      import React, { useState, useEffect, useRef } from 'react';
+      import { createRoot } from 'react-dom/client';
+      import { joinRoom } from 'trystero';
+      import { GoogleGenAI, Type } from '@google/genai';
+
+      // --- TYPES & CONSTANTS ---
+      
+      const ZoneId = {
+        TOWN_SQUARE: 'TOWN_SQUARE',
+        FROZEN_LAKE: 'FROZEN_LAKE',
+        SANTA_WORKSHOP: 'SANTA_WORKSHOP',
+        MYSTIC_FOREST: 'MYSTIC_FOREST'
+      };
+
+      const MiniGameType = {
+        TRIVIA: 'TRIVIA',
+        CLICKER: 'CLICKER',
+        MEMORY: 'MEMORY'
+      };
+
+      const WORLD_WIDTH = 1000;
+      const WORLD_HEIGHT = 800;
+
+      const ZONES = {
+        [ZoneId.TOWN_SQUARE]: {
+          id: ZoneId.TOWN_SQUARE,
+          name: "Cozy Christmas Cabin",
+          description: "Warm yourself by the fire and play with friends!",
+          width: 1000,
+          height: 800,
+          backgroundPattern: 'repeating-linear-gradient(45deg, #2f1b1b 0px, #3f2b2b 20px)', 
+          interactables: [
+            { id: 'game_trivia_1', x: 200, y: 200, label: 'Trivia Fireplace', icon: '🔥', type: 'GAME', gameType: MiniGameType.TRIVIA, range: 80 },
+            { id: 'game_clicker_1', x: 800, y: 200, label: 'Gift Wrapping', icon: '🎁', type: 'GAME', gameType: MiniGameType.CLICKER, range: 80 },
+            { id: 'npc_santa', x: 500, y: 150, label: 'Santa', icon: '🎅', type: 'NPC', message: "Welcome! The highest score wins a real prize!", range: 100 },
+            { id: 'portal_forest', x: 500, y: 700, label: 'Go Outside', icon: '🌲', type: 'PORTAL', targetZone: ZoneId.MYSTIC_FOREST, range: 80 },
+          ]
+        },
+        [ZoneId.MYSTIC_FOREST]: {
+          id: ZoneId.MYSTIC_FOREST,
+          name: "Snowy Backyard",
+          description: "Fresh snow and hidden secrets.",
+          width: 1000,
+          height: 800,
+          backgroundPattern: 'radial-gradient(circle, #e0f2fe 0%, #0c4a6e 100%)',
+          interactables: [
+            { id: 'portal_square', x: 500, y: 100, label: 'Enter Cabin', icon: '🏠', type: 'PORTAL', targetZone: ZoneId.TOWN_SQUARE, range: 80 },
+            { id: 'game_trivia_2', x: 800, y: 600, label: 'Snowman Riddle', icon: '☃️', type: 'GAME', gameType: MiniGameType.TRIVIA, range: 80 },
+          ]
+        }
+      };
+
+      const HIDDEN_EGGS = [
+        { id: 'egg_1', zoneId: ZoneId.TOWN_SQUARE, x: 100, y: 700, found: false },
+        { id: 'egg_2', zoneId: ZoneId.TOWN_SQUARE, x: 900, y: 700, found: false },
+        { id: 'egg_3', zoneId: ZoneId.MYSTIC_FOREST, x: 200, y: 400, found: false },
+      ];
+
+      // --- SERVICES ---
+
+      // Gemini Service
+      // Note: In this static demo, we check for API key safely.
+      const getApiKey = () => {
+        if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+            return process.env.API_KEY;
+        }
+        return '';
+      };
+      
+      let ai = null;
+      const apiKey = getApiKey();
+      if (apiKey) {
+        ai = new GoogleGenAI({ apiKey });
+      }
+
+      const generateChristmasTrivia = async () => {
+        if (!ai) {
+          return {
+            question: "Which reindeer has a red nose? (Gemini API Key missing)",
+            options: ["Dasher", "Rudolph", "Vixen", "Comet"],
+            correctAnswerIndex: 1
+          };
+        }
+        try {
+          const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: "Generate a fun, slightly difficult Christmas trivia question.",
+            config: {
+              responseMimeType: "application/json",
+              responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                  question: { type: Type.STRING },
+                  options: {
+                    type: Type.ARRAY,
+                    items: { type: Type.STRING },
+                    description: "4 possible answers"
+                  },
+                  correctAnswerIndex: {
+                    type: Type.INTEGER,
+                    description: "Index of the correct answer (0-3)"
+                  }
+                }
+              }
+            }
+          });
+          if (response.text) {
+            return JSON.parse(response.text);
+          }
+          throw new Error("No response text");
+        } catch (error) {
+          console.error("Gemini Error:", error);
+          return {
+            question: "What traditional Christmas plant is known for its red berries?",
+            options: ["Mistletoe", "Holly", "Ivy", "Poinsettia"],
+            correctAnswerIndex: 1
+          };
+        }
+      };
+
+      const judgeMiniGame = async (context) => {
+         if (!ai) return "Nice work!";
+         try {
+           const response = await ai.models.generateContent({
+             model: 'gemini-2.5-flash',
+             contents: `Give a short, 1-sentence festive congratulation for: ${context}`,
+           });
+           return response.text || "Merry Christmas!";
+         } catch (e) {
+           return "Merry Christmas!";
+         }
+      }
+
+      // Network Service
+      const ROOM_ID = 'christmas_world_2024_lobby_v3';
+      
+      class NetworkService {
+        constructor() {
+          this.room = joinRoom({ appId: 'christmas-hunt-game' }, ROOM_ID);
+          
+          this.onPlayerMoved = null;
+          this.onPlayerLeft = null;
+          this.onChatMessage = null;
+          this.onScoreUpdate = null;
+          this.onPeerJoined = null;
+
+          const [sendMove, getMove] = this.room.makeAction('move');
+          const [sendChat, getChat] = this.room.makeAction('chat');
+          const [sendScore, getScore] = this.room.makeAction('score');
+
+          this.sendMoveAction = sendMove;
+          this.sendChatAction = sendChat;
+          this.sendScoreAction = sendScore;
+
+          this.room.onPeerJoin((peerId) => {
+            console.log(`Peer ${peerId} joined`);
+            if (this.onPeerJoined) this.onPeerJoined(peerId);
+          });
+
+          this.room.onPeerLeave((peerId) => {
+            if (this.onPlayerLeft) this.onPlayerLeft(peerId);
+          });
+
+          getMove((data, peerId) => {
+            const player = {
+              id: peerId, 
+              name: data.name,
+              avatar: data.avatar,
+              score: data.score,
+              isCurrentUser: false,
+              x: data.x,
+              y: data.y,
+            };
+            if (this.onPlayerMoved) this.onPlayerMoved(player);
+          });
+
+          getChat((data) => {
+            if (this.onChatMessage) this.onChatMessage(data);
+          });
+
+          getScore((data, peerId) => {
+            if (this.onScoreUpdate) this.onScoreUpdate(peerId, data.score);
+          });
+        }
+
+        broadcastMove(player) {
+          this.sendMoveAction({
+            x: player.x,
+            y: player.y,
+            id: player.id,
+            name: player.name,
+            avatar: player.avatar,
+            score: player.score
+          });
+        }
+
+        broadcastChat(msg) {
+          this.sendChatAction(msg);
+        }
+
+        broadcastScore(playerId, score) {
+          this.sendScoreAction({ id: playerId, score });
+        }
+
+        getMyId() {
+          return this.room.selfId;
+        }
+      }
+
+      // --- COMPONENTS ---
+
+      const Leaderboard = ({ players }) => {
+        const sortedPlayers = [...players].sort((a, b) => b.score - a.score);
+        return (
+          <div className="absolute top-4 left-4 z-50 w-72 bg-slate-900/80 backdrop-blur-md border border-yellow-500/30 rounded-xl overflow-hidden shadow-2xl text-white">
+            <div className="bg-gradient-to-r from-red-800 to-red-600 p-3 border-b border-yellow-500/50 flex justify-between items-center">
+              <h2 className="font-christmas text-xl font-bold text-yellow-100">🏆 Top Elves</h2>
+              <span className="text-xs text-red-200">LIVE</span>
+            </div>
+            <ul className="divide-y divide-white/10 max-h-64 overflow-y-auto">
+              {sortedPlayers.map((player, index) => (
+                <li key={player.id} className={`flex items-center justify-between p-3 ${player.isCurrentUser ? 'bg-yellow-500/20' : ''}`}>
+                  <div className="flex items-center space-x-3">
+                    <span className={`font-bold w-4 text-center ${index < 3 ? 'text-yellow-400' : 'text-slate-400'}`}>
+                      {index + 1}
+                    </span>
+                    <span className="text-2xl">{player.avatar}</span>
+                    <div className="flex flex-col">
+                      <span className={`font-semibold text-sm ${player.isCurrentUser ? 'text-yellow-300' : 'text-white'}`}>
+                        {player.name} {player.isCurrentUser && '(You)'}
+                      </span>
+                    </div>
+                  </div>
+                  <span className="font-mono text-yellow-400 font-bold">{player.score.toLocaleString()}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      };
+
+      const MiniGameModal = ({ type, isOpen, onClose, onWin }) => {
+        const [loading, setLoading] = useState(false);
+        const [gameState, setGameState] = useState('START');
+        const [trivia, setTrivia] = useState(null);
+        const [congratsMsg, setCongratsMsg] = useState("");
+        const [clicks, setClicks] = useState(0);
+        const [timeLeft, setTimeLeft] = useState(5);
+
+        useEffect(() => {
+          if (isOpen) {
+            setGameState('START');
+            setClicks(0);
+            setTimeLeft(5);
+            setTrivia(null);
+            setCongratsMsg("");
+          }
+        }, [isOpen]);
+
+        useEffect(() => {
+          let timer;
+          if (gameState === 'PLAYING' && type === MiniGameType.CLICKER) {
+            timer = setInterval(() => {
+              setTimeLeft((prev) => {
+                if (prev <= 1) {
+                  setGameState('LOST');
+                  return 0;
+                }
+                return prev - 1;
+              });
+            }, 1000);
+          }
+          return () => clearInterval(timer);
+        }, [gameState, type]);
+
+        const startGame = async () => {
+          setLoading(true);
+          if (type === MiniGameType.TRIVIA) {
+            const q = await generateChristmasTrivia();
+            setTrivia(q);
+            setGameState('PLAYING');
+          } else if (type === MiniGameType.CLICKER) {
+            setGameState('PLAYING');
+          }
+          setLoading(false);
+        };
+
+        const handleTriviaAnswer = async (index) => {
+          if (!trivia) return;
+          if (index === trivia.correctAnswerIndex) {
+            const msg = await judgeMiniGame("answering a Christmas trivia correctly");
+            setCongratsMsg(msg);
+            setGameState('WON');
+            onWin(30);
+          } else {
+            setGameState('LOST');
+          }
+        };
+
+        const handleClicker = async () => {
+          const newClicks = clicks + 1;
+          setClicks(newClicks);
+          if (newClicks >= 15) {
+            const msg = await judgeMiniGame("wrapping gifts extremely fast");
+            setCongratsMsg(msg);
+            setGameState('WON');
+            onWin(20);
+          }
+        };
+
+        if (!isOpen) return null;
+
+        return (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+            <div className="bg-slate-800 border-2 border-yellow-500 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl relative">
+              <button onClick={onClose} className="absolute top-2 right-2 text-gray-400 hover:text-white p-2">✕</button>
+              <div className="p-6 text-center">
+                <h2 className="text-2xl font-christmas text-yellow-400 mb-4">
+                  {type === MiniGameType.TRIVIA ? 'Christmas Trivia' : 'Gift Rush'}
+                </h2>
+                {loading && <div className="text-white animate-pulse">Summoning holiday spirit...</div>}
+                {!loading && gameState === 'START' && (
+                   <div className="space-y-4">
+                     <p className="text-gray-300">
+                       {type === MiniGameType.TRIVIA ? "Answer correctly to earn 30 points!" : "Click the button 15 times in 5 seconds to earn 20 points!"}
+                     </p>
+                     <button onClick={startGame} className="bg-red-600 hover:bg-red-500 text-white font-bold py-3 px-8 rounded-full shadow-lg">Play Now</button>
+                   </div>
+                )}
+                {!loading && gameState === 'PLAYING' && type === MiniGameType.TRIVIA && trivia && (
+                  <div className="space-y-4 text-left">
+                    <p className="text-lg font-bold text-white mb-4">{trivia.question}</p>
+                    <div className="grid grid-cols-1 gap-2">
+                      {trivia.options.map((opt, idx) => (
+                        <button key={idx} onClick={() => handleTriviaAnswer(idx)} className="bg-slate-700 hover:bg-slate-600 text-white p-3 rounded-lg text-left hover:border-yellow-400 border border-transparent">{opt}</button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {!loading && gameState === 'PLAYING' && type === MiniGameType.CLICKER && (
+                  <div className="space-y-6">
+                    <div className="text-6xl font-bold text-white mb-2 select-none">{clicks} / 15</div>
+                    <div className="text-red-400 font-mono text-xl">Time: {timeLeft}s</div>
+                    <button onMouseDown={handleClicker} className="bg-green-600 hover:bg-green-500 active:bg-green-700 text-white font-bold w-full h-32 rounded-xl text-2xl shadow-lg select-none">CLICK ME!</button>
+                  </div>
+                )}
+                {gameState === 'WON' && (
+                  <div className="animate-float">
+                    <div className="text-6xl mb-4">🎉</div>
+                    <h3 className="text-2xl font-bold text-green-400 mb-2">You Won!</h3>
+                    <p className="text-yellow-200 italic mb-4">"{congratsMsg}"</p>
+                    <button onClick={onClose} className="mt-6 bg-slate-600 px-6 py-2 rounded-lg hover:bg-slate-500">Continue</button>
+                  </div>
+                )}
+                {gameState === 'LOST' && (
+                  <div>
+                     <div className="text-6xl mb-4">🧊</div>
+                     <h3 className="text-2xl font-bold text-blue-300 mb-2">Oh no!</h3>
+                     <button onClick={startGame} className="mt-6 bg-slate-600 px-6 py-2 rounded-lg hover:bg-slate-500 mr-2">Retry</button>
+                     <button onClick={onClose} className="mt-6 bg-transparent border border-slate-500 px-6 py-2 rounded-lg hover:bg-slate-700">Close</button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      };
+
+      const ChatInterface = ({ messages, onSendMessage }) => {
+        const [inputText, setInputText] = useState("");
+        const [isTyping, setIsTyping] = useState(false);
+        const inputRef = useRef(null);
+        const scrollRef = useRef(null);
+
+        useEffect(() => {
+          if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+        }, [messages]);
+
+        useEffect(() => {
+          const handleGlobalKeyDown = (e) => {
+            if (e.key === 'Enter') {
+              if (!isTyping) {
+                setIsTyping(true);
+                setTimeout(() => inputRef.current?.focus(), 10);
+              }
+            }
+            if (e.key === 'Escape') {
+              setIsTyping(false);
+              inputRef.current?.blur();
+            }
+          };
+          window.addEventListener('keydown', handleGlobalKeyDown);
+          return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+        }, [isTyping]);
+
+        const handleSend = () => {
+          if (inputText.trim()) {
+            onSendMessage(inputText.trim());
+            setInputText("");
+          }
+        };
+
+        return (
+          <div className="absolute bottom-4 left-4 z-50 flex flex-col items-start w-[350px] max-w-full">
+            <div ref={scrollRef} className="w-full h-48 mb-2 overflow-y-auto scrollbar-thin scrollbar-thumb-white/20 bg-gradient-to-t from-black/80 to-transparent p-2 rounded-lg" style={{ WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 20%)' }}>
+              {messages.map((msg) => (
+                 <div key={msg.id} className="mb-1 text-sm shadow-black drop-shadow-md">
+                   <span className="font-bold text-yellow-400">{msg.senderName}:</span>
+                   <span className="text-white ml-1">{msg.text}</span>
+                 </div>
+              ))}
+            </div>
+            <div className={`w-full transition-opacity duration-200 ${isTyping ? 'opacity-100' : 'opacity-60 hover:opacity-100'}`}>
+              {isTyping ? (
+                <div className="flex w-full bg-black/70 rounded-full border border-white/30 backdrop-blur">
+                   <input
+                     ref={inputRef}
+                     type="text"
+                     className="bg-transparent text-white px-4 py-2 w-full focus:outline-none rounded-full"
+                     placeholder="Type a message..."
+                     value={inputText}
+                     onChange={(e) => setInputText(e.target.value)}
+                     onKeyDown={(e) => { if (e.key === 'Enter') handleSend(); }}
+                     onBlur={() => { setTimeout(() => { if (!inputText) setIsTyping(false); }, 200); }}
+                   />
+                   <button onClick={handleSend} className="text-yellow-400 font-bold px-4 hover:text-white">SEND</button>
+                </div>
+              ) : (
+                <div className="text-white/50 text-xs italic bg-black/40 px-3 py-1 rounded-full cursor-pointer hover:bg-black/60 hover:text-white" onClick={() => { setIsTyping(true); setTimeout(() => inputRef.current?.focus(), 10); }}>
+                  Press <span className="font-bold border border-white/30 rounded px-1">Enter</span> to chat
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      };
+
+      const GameWorld = ({ zone, player, otherPlayers, hiddenEggs, onMovePlayer, onInteract, onFoundEgg }) => {
+        const [keys, setKeys] = useState({});
+        const requestRef = useRef(0);
+        const SPEED = 5;
+
+        useEffect(() => {
+          const handleDown = (e) => { if (e.target.tagName !== 'INPUT') setKeys(k => ({ ...k, [e.code]: true })); };
+          const handleUp = (e) => setKeys(k => ({ ...k, [e.code]: false }));
+          window.addEventListener('keydown', handleDown);
+          window.addEventListener('keyup', handleUp);
+          return () => { window.removeEventListener('keydown', handleDown); window.removeEventListener('keyup', handleUp); };
+        }, []);
+
+        const animate = () => {
+          let dx = 0;
+          let dy = 0;
+          if (keys['KeyW'] || keys['ArrowUp']) dy -= SPEED;
+          if (keys['KeyS'] || keys['ArrowDown']) dy += SPEED;
+          if (keys['KeyA'] || keys['ArrowLeft']) dx -= SPEED;
+          if (keys['KeyD'] || keys['ArrowRight']) dx += SPEED;
+
+          if (dx !== 0 && dy !== 0) { dx *= 0.707; dy *= 0.707; }
+
+          if (dx !== 0 || dy !== 0) {
+            const nextX = Math.max(20, Math.min(zone.width - 20, player.x + dx));
+            const nextY = Math.max(20, Math.min(zone.height - 20, player.y + dy));
+            onMovePlayer(nextX, nextY);
+            
+            // Interaction Check
+            hiddenEggs.forEach(egg => {
+              if (egg.zoneId === zone.id && !egg.found) {
+                if (Math.hypot(egg.x - nextX, egg.y - nextY) < 40) onFoundEgg(egg.id);
+              }
+            });
+          }
+          requestRef.current = requestAnimationFrame(animate);
+        };
+
+        useEffect(() => {
+          requestRef.current = requestAnimationFrame(animate);
+          return () => cancelAnimationFrame(requestRef.current);
+        }, [keys, player.x, player.y, zone]);
+
+        const getNearestInteractable = () => {
+          let nearest = null;
+          let minDst = Infinity;
+          zone.interactables.forEach(item => {
+            const dst = Math.hypot(item.x - player.x, item.y - player.y);
+            if (dst < item.range && dst < minDst) { minDst = dst; nearest = item; }
+          });
+          return nearest;
+        };
+        const nearestItem = getNearestInteractable();
+
+        useEffect(() => {
+          const handleInteractKey = (e) => { if (e.code === 'KeyE' && nearestItem) onInteract(nearestItem); };
+          window.addEventListener('keydown', handleInteractKey);
+          return () => window.removeEventListener('keydown', handleInteractKey);
+        }, [nearestItem, onInteract]);
+
+        const camX = -player.x + window.innerWidth / 2;
+        const camY = -player.y + window.innerHeight / 2;
+
+        const renderPlayer = (p) => (
+          <div key={p.id} className="absolute flex flex-col items-center transition-transform duration-100 ease-linear z-20" style={{ transform: `translate(${p.x}px, ${p.y}px)` }}>
+            {p.currentMessage && (
+              <div className="absolute -top-16 bg-white text-black px-3 py-2 rounded-xl text-sm font-bold shadow-lg whitespace-nowrap animate-float z-30 border border-gray-300">
+                 {p.currentMessage}
+                 <div className="absolute top-full left-1/2 -translate-x-1/2 border-8 border-transparent border-t-white"></div>
+              </div>
+            )}
+            <span className={`text-xs font-bold mb-1 px-2 py-0.5 rounded bg-black/50 ${p.isCurrentUser ? 'text-yellow-300' : 'text-white'}`}>{p.name}</span>
+            <div className={`text-4xl filter drop-shadow-lg ${p.isCurrentUser ? 'scale-110' : ''}`}>{p.avatar}</div>
+          </div>
+        );
+
+        return (
+          <div className="w-full h-full bg-slate-900 overflow-hidden relative">
+            <div className="will-change-transform" style={{ transform: `translate(${camX}px, ${camY}px)`, width: zone.width, height: zone.height, background: zone.backgroundPattern }}>
+              <div className="absolute inset-0 opacity-20 pointer-events-none" style={{ backgroundImage: 'radial-gradient(white 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
+              {zone.interactables.map(item => (
+                <div key={item.id} className="absolute flex flex-col items-center justify-center transform -translate-x-1/2 -translate-y-1/2" style={{ left: item.x, top: item.y }}>
+                   <div className="text-4xl animate-pulse cursor-pointer hover:scale-125 transition-transform" onClick={() => onInteract(item)}>{item.icon}</div>
+                   <span className="mt-2 bg-black/60 px-2 py-1 rounded text-white text-xs">{item.label}</span>
+                   <div className="absolute border-2 border-yellow-400/30 rounded-full animate-ping" style={{ width: item.range * 2, height: item.range * 2, left: -item.range + 'px', top: -item.range + 'px' }} />
+                </div>
+              ))}
+              {hiddenEggs.filter(e => e.zoneId === zone.id && !e.found).map(egg => (
+                <div key={egg.id} className="absolute text-2xl animate-bounce cursor-pointer hover:scale-125" style={{ left: egg.x, top: egg.y }} onClick={() => onFoundEgg(egg.id)}>🎁</div>
+              ))}
+              {otherPlayers.map(renderPlayer)}
+              {renderPlayer(player)}
+            </div>
+            {nearestItem && (
+              <div className="absolute bottom-24 left-1/2 -translate-x-1/2 text-white font-bold text-xl animate-bounce drop-shadow-md">
+                 Press <span className="bg-yellow-500 text-black px-2 rounded">E</span> to interact with {nearestItem.label}
+              </div>
+            )}
+          </div>
+        );
+      };
+
+      const App = () => {
+        const networkRef = useRef(null);
+        const playerRef = useRef(null);
+        const [player, setPlayer] = useState({
+          id: 'init', 
+          name: 'Elf_' + Math.floor(Math.random() * 900 + 100),
+          score: 0,
+          isCurrentUser: true,
+          avatar: ['🎅', '🧝', '🦌', '⛄', '🤶'][Math.floor(Math.random() * 5)],
+          x: WORLD_WIDTH / 2 + (Math.random() * 100 - 50),
+          y: WORLD_HEIGHT / 2 + (Math.random() * 100 - 50)
+        });
+        
+        useEffect(() => { playerRef.current = player; }, [player]);
+        const [currentZoneId, setCurrentZoneId] = useState(ZoneId.TOWN_SQUARE);
+        const [easterEggs, setEasterEggs] = useState(HIDDEN_EGGS);
+        const [otherPlayers, setOtherPlayers] = useState([]);
+        const [messages, setMessages] = useState([]);
+        const [activeMiniGame, setActiveMiniGame] = useState(null);
+        const [notification, setNotification] = useState(null);
+
+        useEffect(() => {
+          const net = new NetworkService();
+          networkRef.current = net;
+          setPlayer(p => ({ ...p, id: net.getMyId() }));
+          setTimeout(() => { if (playerRef.current) net.broadcastMove(playerRef.current); }, 1000);
+          
+          net.onPlayerMoved = (remotePlayer) => {
+            setOtherPlayers(prev => {
+              const idx = prev.findIndex(p => p.id === remotePlayer.id);
+              if (idx >= 0) {
+                const updated = [...prev];
+                updated[idx] = { ...updated[idx], x: remotePlayer.x, y: remotePlayer.y, score: remotePlayer.score, name: remotePlayer.name, avatar: remotePlayer.avatar };
+                return updated;
+              } else { return [...prev, remotePlayer]; }
+            });
+          };
+          net.onPeerJoined = (peerId) => {
+            if (playerRef.current) net.broadcastMove(playerRef.current);
+            showNotification("A new player has entered!");
+          };
+          net.onPlayerLeft = (peerId) => setOtherPlayers(prev => prev.filter(p => p.id !== peerId));
+          net.onChatMessage = (msg) => {
+            setMessages(prev => [...prev, msg]);
+            setOtherPlayers(prev => prev.map(p => { if (p.id === msg.senderId) return { ...p, currentMessage: msg.text, messageTimer: Date.now() + 5000 }; return p; }));
+          };
+          net.onScoreUpdate = (peerId, newScore) => {
+             setOtherPlayers(prev => prev.map(p => { if (p.id === peerId) return { ...p, score: newScore }; return p; }));
+          };
+        }, []);
+
+        const lastBroadcastRef = useRef(0);
+        const handlePlayerMove = (x, y) => {
+          setPlayer(prev => {
+            const updated = { ...prev, x, y };
+            const now = Date.now();
+            if (networkRef.current && now - lastBroadcastRef.current > 50) {
+              networkRef.current.broadcastMove(updated);
+              lastBroadcastRef.current = now;
+            }
+            return updated;
+          });
+        };
+
+        useEffect(() => {
+          const interval = setInterval(() => {
+            const now = Date.now();
+            if (player.messageTimer && now > player.messageTimer) setPlayer(p => ({ ...p, currentMessage: undefined, messageTimer: undefined }));
+            setOtherPlayers(prev => prev.map(p => { if (p.messageTimer && now > p.messageTimer) return { ...p, currentMessage: undefined, messageTimer: undefined }; return p; }));
+          }, 500);
+          return () => clearInterval(interval);
+        }, [player.messageTimer]);
+
+        const handleInteract = (target) => {
+          if (target.type === 'PORTAL' && target.targetZone) {
+            setCurrentZoneId(target.targetZone);
+            handlePlayerMove(WORLD_WIDTH/2, WORLD_HEIGHT/2);
+            showNotification(`Entered ${target.label}`);
+          } else if (target.type === 'GAME' && target.gameType) {
+            setActiveMiniGame(target.gameType);
+          } else if (target.type === 'NPC') {
+            showNotification(target.message || "Hello!");
+          }
+        };
+
+        const handleSendMessage = (text) => {
+          setPlayer(p => ({ ...p, currentMessage: text, messageTimer: Date.now() + 5000 }));
+          const msg = { id: Date.now().toString() + Math.random(), senderId: player.id, senderName: player.name, text: text, timestamp: Date.now() };
+          setMessages(prev => [...prev, msg]);
+          if (networkRef.current) networkRef.current.broadcastChat(msg);
+          if (text.toLowerCase().includes("christmas")) judgeMiniGame(text);
+        };
+
+        const handleMiniGameWin = (points) => {
+          setPlayer(prev => {
+            const newScore = prev.score + points;
+            if (networkRef.current) {
+              networkRef.current.broadcastScore(prev.id, newScore);
+              networkRef.current.broadcastMove({ ...prev, score: newScore });
+            }
+            return { ...prev, score: newScore };
+          });
+          showNotification(`Mini-Game Won! +${points} Points!`);
+          setTimeout(() => setActiveMiniGame(null), 2500);
+        };
+
+        const handleFoundEgg = (eggId) => {
+          setEasterEggs(prev => prev.map(egg => egg.id === eggId ? { ...egg, found: true } : egg));
+          setPlayer(prev => {
+            const newScore = prev.score + 10000;
+            if (networkRef.current) networkRef.current.broadcastScore(prev.id, newScore);
+            return { ...prev, score: newScore };
+          });
+          showNotification("🌟 SECRET FOUND! +10,000 POINTS! 🌟");
+        };
+
+        const showNotification = (msg) => {
+          setNotification(msg);
+          setTimeout(() => setNotification(null), 3000);
+        };
+
+        return (
+          <div className="w-screen h-screen bg-black overflow-hidden relative font-sans">
+            <GameWorld 
+              zone={ZONES[currentZoneId]} player={player} otherPlayers={otherPlayers} hiddenEggs={easterEggs}
+              onMovePlayer={handlePlayerMove} onInteract={handleInteract} onFoundEgg={handleFoundEgg}
+            />
+            <div className="absolute inset-0 pointer-events-none">
+              <div className="pointer-events-auto"><Leaderboard players={[player, ...otherPlayers]} /></div>
+              <div className="pointer-events-auto"><ChatInterface messages={messages} onSendMessage={handleSendMessage} /></div>
+              {notification && (
+                <div className="absolute top-20 left-1/2 transform -translate-x-1/2 z-[60] animate-bounce pointer-events-auto">
+                  <div className="bg-yellow-500 text-black font-bold px-8 py-4 rounded-full shadow-lg border-4 border-white text-lg">{notification}</div>
+                </div>
+              )}
+              <div className="absolute bottom-4 right-4 z-50 text-white bg-black/50 p-4 rounded-xl backdrop-blur-md border border-white/20 pointer-events-auto">
+                 <div className="text-xs text-gray-400">YOUR SCORE</div>
+                 <div className="text-4xl font-mono text-yellow-400 font-bold">{player.score.toLocaleString()}</div>
+                 <div className="text-xs text-right mt-2 text-blue-300">{ZONES[currentZoneId].name}</div>
+                 <div className="text-[10px] text-gray-500 text-right mt-1">POS: {Math.round(player.x)}, {Math.round(player.y)}</div>
+                 <div className="text-[10px] text-green-400 text-right mt-1">ONLINE: {otherPlayers.length + 1}</div>
+              </div>
+              <div className="absolute top-4 right-4 text-white/50 text-xs text-right hidden md:block">
+                 Use <span className="font-bold text-white">WASD</span> to Move<br/>
+                 Press <span className="font-bold text-white">ENTER</span> to Chat<br/>
+                 MULTIPLAYER ACTIVE <span className="inline-block w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
+              </div>
+            </div>
+            {activeMiniGame && <MiniGameModal type={activeMiniGame} isOpen={true} onClose={() => setActiveMiniGame(null)} onWin={handleMiniGameWin} />}
+          </div>
+        );
+      };
+
+      const container = document.getElementById('root');
+      if (container) {
+        const root = createRoot(container);
+        root.render(<App />);
+      }
+    </script>
   </body>
 </html>
