@@ -2,8 +2,10 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>Winter Wonderland: Christmas Hunt</title>
+    <!-- Fix Favicon 404 with a Christmas Tree Emoji -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎄</text></svg>">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Mountains+of+Christmas:wght@400;700&family=Nunito:wght@400;600;800&display=swap" rel="stylesheet">
     <style>
@@ -12,6 +14,7 @@
         background-color: #0f172a;
         color: white;
         overflow: hidden; /* Prevent scrolling, app handles viewport */
+        touch-action: none; /* Prevent browser zoom/scroll on mobile */
       }
       .font-christmas {
         font-family: 'Mountains of Christmas', cursive;
@@ -32,6 +35,7 @@
     "react": "https://esm.sh/react@^19.2.3",
     "@google/genai": "https://esm.sh/@google/genai@^1.33.0",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react-dom/client": "https://esm.sh/react-dom@^19.2.3/client",
     "trystero": "https://esm.sh/trystero@0.19.0"
   }
 }
@@ -39,5 +43,7 @@
 </head>
   <body>
     <div id="root"></div>
+    <!-- Load the Application Entry Point -->
+    <script type="module" src="./index.tsx"></script>
   </body>
 </html>

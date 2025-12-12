@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { createRoot } from 'react-dom/client';
 import { ZONES, HIDDEN_EGGS, WORLD_WIDTH, WORLD_HEIGHT } from './constants';
 import { ZoneId, Player, Interactable, MiniGameType, EasterEgg, ChatMessage } from './types';
 import { GameWorld } from './components/GameWorld';
@@ -9,7 +8,7 @@ import { ChatInterface } from './components/ChatInterface';
 import { judgeMiniGame } from './services/geminiService';
 import { NetworkService } from './services/networkService';
 
-const App: React.FC = () => {
+export const App: React.FC = () => {
   const networkRef = useRef<NetworkService | null>(null);
   const playerRef = useRef<Player | null>(null); // Ref to access latest player state in callbacks
 
@@ -243,9 +242,3 @@ const App: React.FC = () => {
     </div>
   );
 };
-
-const container = document.getElementById('root');
-if (container) {
-  const root = createRoot(container);
-  root.render(<App />);
-}
