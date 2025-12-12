@@ -17,7 +17,7 @@ export const WorldZone: React.FC<WorldZoneProps> = ({ zone, hiddenEggs, onIntera
       {/* Background Image */}
       <div 
         className="absolute inset-0 bg-cover bg-center transition-all duration-1000 ease-in-out"
-        style={{ backgroundImage: `url(${zone.backgroundUrl})` }}
+        style={{ background: zone.backgroundPattern }}
       >
         <div className="absolute inset-0 bg-black/30"></div> {/* Overlay for readability */}
       </div>

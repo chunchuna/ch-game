@@ -1,60 +1,70 @@
 import { ZoneId, ZoneData, MiniGameType, EasterEgg } from './types';
 
+// Initial dummy players with positions
 export const INITIAL_LEADERBOARD = [
-  { id: 'p2', name: 'ElfTwinkle', score: 8500, isCurrentUser: false, avatar: '🧝' },
-  { id: 'p3', name: 'RudolphRacer', score: 6200, isCurrentUser: false, avatar: '🦌' },
-  { id: 'p4', name: 'FrostyFan', score: 4500, isCurrentUser: false, avatar: '⛄' },
-  { id: 'p5', name: 'MrsClausCookie', score: 2100, isCurrentUser: false, avatar: '👵' },
+  { id: 'p2', name: 'ElfTwinkle', score: 8500, isCurrentUser: false, avatar: '🧝', x: 400, y: 300 },
+  { id: 'p3', name: 'RudolphRacer', score: 6200, isCurrentUser: false, avatar: '🦌', x: 600, y: 500 },
+  { id: 'p4', name: 'FrostyFan', score: 4500, isCurrentUser: false, avatar: '⛄', x: 200, y: 800 },
+  { id: 'p5', name: 'MrsClausCookie', score: 2100, isCurrentUser: false, avatar: '👵', x: 800, y: 200 },
 ];
+
+export const WORLD_WIDTH = 2000;
+export const WORLD_HEIGHT = 2000;
 
 export const ZONES: Record<ZoneId, ZoneData> = {
   [ZoneId.TOWN_SQUARE]: {
     id: ZoneId.TOWN_SQUARE,
-    name: "North Pole Square",
-    description: "The bustling heart of the village. A giant tree sparkles in the center.",
-    backgroundUrl: "https://picsum.photos/id/604/1200/800", // Snow/mountains
+    name: "North Pole Hall",
+    description: "The Grand Lobby. Meet friends and find games!",
+    width: 2000,
+    height: 2000,
+    backgroundPattern: 'radial-gradient(circle, #1e293b 0%, #0f172a 100%)', 
     interactables: [
-      { id: 'portal_forest', x: 80, y: 50, label: 'To Forest', icon: '🌲', type: 'PORTAL', targetZone: ZoneId.MYSTIC_FOREST },
-      { id: 'portal_lake', x: 20, y: 60, label: 'To Lake', icon: '❄️', type: 'PORTAL', targetZone: ZoneId.FROZEN_LAKE },
-      { id: 'portal_workshop', x: 50, y: 20, label: 'To Workshop', icon: '🏠', type: 'PORTAL', targetZone: ZoneId.SANTA_WORKSHOP },
-      { id: 'game_trivia_1', x: 45, y: 60, label: 'Wise Owl', icon: '🦉', type: 'GAME', gameType: MiniGameType.TRIVIA },
+      { id: 'game_trivia_1', x: 400, y: 400, label: 'Wise Owl Trivia', icon: '🦉', type: 'GAME', gameType: MiniGameType.TRIVIA, range: 100 },
+      { id: 'game_clicker_1', x: 1200, y: 600, label: 'Speedy Skater', icon: '⛸️', type: 'GAME', gameType: MiniGameType.CLICKER, range: 100 },
+      { id: 'npc_santa', x: 1000, y: 150, label: 'Santa', icon: '🎅', type: 'NPC', message: "Ho Ho Ho! Find the hidden eggs!", range: 120 },
+      { id: 'portal_forest', x: 1800, y: 1000, label: 'Mystic Forest', icon: '🌲', type: 'PORTAL', targetZone: ZoneId.MYSTIC_FOREST, range: 100 },
     ]
   },
+  // Simplified other zones for this demo, focusing on the main hall movement
   [ZoneId.FROZEN_LAKE]: {
     id: ZoneId.FROZEN_LAKE,
-    name: "Crystal Lake",
-    description: "A slippery sheet of ice reflecting the aurora above.",
-    backgroundUrl: "https://picsum.photos/id/1036/1200/800", // Winter nature
+    name: "Frozen Lake",
+    description: "Slippery ice!",
+    width: 1500,
+    height: 1500,
+    backgroundPattern: 'linear-gradient(to bottom, #bae6fd, #7dd3fc)',
     interactables: [
-      { id: 'portal_square', x: 90, y: 80, label: 'Back to Town', icon: '🏘️', type: 'PORTAL', targetZone: ZoneId.TOWN_SQUARE },
-      { id: 'game_clicker_1', x: 30, y: 40, label: 'Speedy Skater', icon: '⛸️', type: 'GAME', gameType: MiniGameType.CLICKER },
+      { id: 'portal_square', x: 100, y: 750, label: 'Back to Hall', icon: '🏠', type: 'PORTAL', targetZone: ZoneId.TOWN_SQUARE, range: 100 }
     ]
   },
   [ZoneId.MYSTIC_FOREST]: {
     id: ZoneId.MYSTIC_FOREST,
-    name: "Whispering Pines",
-    description: "Ancient trees guard secrets in the deep snow.",
-    backgroundUrl: "https://picsum.photos/id/1029/1200/800", // Forest park
+    name: "Mystic Forest",
+    description: "Dark and mysterious.",
+    width: 1500,
+    height: 1500,
+    backgroundPattern: 'repeating-linear-gradient(45deg, #064e3b 0px, #065f46 40px)',
     interactables: [
-      { id: 'portal_square', x: 10, y: 80, label: 'Back to Town', icon: '🏘️', type: 'PORTAL', targetZone: ZoneId.TOWN_SQUARE },
-      { id: 'game_trivia_2', x: 70, y: 30, label: 'Old Snowman', icon: '☃️', type: 'GAME', gameType: MiniGameType.TRIVIA },
+      { id: 'portal_square', x: 100, y: 750, label: 'Back to Hall', icon: '🏠', type: 'PORTAL', targetZone: ZoneId.TOWN_SQUARE, range: 100 },
+      { id: 'game_trivia_2', x: 800, y: 500, label: 'Ancient Snowman', icon: '☃️', type: 'GAME', gameType: MiniGameType.TRIVIA, range: 100 },
     ]
   },
   [ZoneId.SANTA_WORKSHOP]: {
     id: ZoneId.SANTA_WORKSHOP,
-    name: "Santa's Workshop",
-    description: "The warm, noisy factory where magic happens.",
-    backgroundUrl: "https://picsum.photos/id/401/1200/800", // Indoors/warm tone
+    name: "Workshop",
+    description: "Toys everywhere!",
+    width: 1200,
+    height: 1200,
+    backgroundPattern: 'linear-gradient(to bottom, #7f1d1d, #450a0a)',
     interactables: [
-      { id: 'portal_square', x: 50, y: 90, label: 'Exit to Town', icon: '🚪', type: 'PORTAL', targetZone: ZoneId.TOWN_SQUARE },
-      { id: 'game_clicker_2', x: 20, y: 50, label: 'Wrap Master', icon: '🎁', type: 'GAME', gameType: MiniGameType.CLICKER },
+      { id: 'portal_square', x: 600, y: 1100, label: 'Exit', icon: '🚪', type: 'PORTAL', targetZone: ZoneId.TOWN_SQUARE, range: 100 }
     ]
   }
 };
 
 export const HIDDEN_EGGS: EasterEgg[] = [
-  { id: 'egg_1', zoneId: ZoneId.TOWN_SQUARE, x: 12, y: 15, found: false },
-  { id: 'egg_2', zoneId: ZoneId.SANTA_WORKSHOP, x: 88, y: 25, found: false },
-  { id: 'egg_3', zoneId: ZoneId.MYSTIC_FOREST, x: 5, y: 90, found: false },
-  { id: 'egg_4', zoneId: ZoneId.FROZEN_LAKE, x: 60, y: 10, found: false },
+  { id: 'egg_1', zoneId: ZoneId.TOWN_SQUARE, x: 250, y: 250, found: false },
+  { id: 'egg_2', zoneId: ZoneId.TOWN_SQUARE, x: 1600, y: 1400, found: false },
+  { id: 'egg_3', zoneId: ZoneId.MYSTIC_FOREST, x: 500, y: 500, found: false },
 ];

@@ -11,24 +11,42 @@ export enum MiniGameType {
   MEMORY = 'MEMORY'
 }
 
+export interface ChatMessage {
+  id: string;
+  senderId: string;
+  senderName: string;
+  text: string;
+  timestamp: number;
+}
+
 export interface Player {
   id: string;
   name: string;
   score: number;
   isCurrentUser: boolean;
   avatar: string;
+  // Position
+  x: number;
+  y: number;
+  // Movement
+  vx?: number;
+  vy?: number;
+  // Chat
+  currentMessage?: string;
+  messageTimer?: number; // Time until bubble disappears
 }
 
 export interface Interactable {
   id: string;
-  x: number; // Percentage 0-100
-  y: number; // Percentage 0-100
+  x: number; // World X
+  y: number; // World Y
   label: string;
   icon: string;
   type: 'GAME' | 'NPC' | 'PORTAL';
   gameType?: MiniGameType;
   targetZone?: ZoneId;
   message?: string;
+  range: number; // Interaction radius
 }
 
 export interface EasterEgg {
@@ -43,7 +61,9 @@ export interface ZoneData {
   id: ZoneId;
   name: string;
   description: string;
-  backgroundUrl: string;
+  width: number;
+  height: number;
+  backgroundPattern: string; // CSS background/color
   interactables: Interactable[];
 }
 
