@@ -428,7 +428,7 @@
         const camY = -player.y + window.innerHeight / 2;
 
         const renderPlayer = (p) => (
-          <div key={p.id} className="absolute flex flex-col items-center transition-transform duration-100 ease-linear z-20" style={{ transform: `translate(${p.x}px, ${p.y}px)` }}>
+          <div key={p.id} className="absolute flex flex-col items-center transition-transform duration-100 ease-linear z-20" style={{ transform: `translate(${p.x}px, ${p.y}px) translate(-50%, -50%)` }}>
             {p.currentMessage && <div className="absolute -top-16 bg-white text-black px-3 py-2 rounded-xl text-sm font-bold shadow-lg animate-float z-30">{p.currentMessage}</div>}
             <span className={`text-[10px] font-bold mb-1 px-1 rounded bg-black/50 ${p.isCurrentUser ? 'text-yellow-300' : 'text-white'}`}>{p.name} {p.isSitting ? '(Sitting)' : ''}</span>
             <div className={`text-4xl filter drop-shadow-lg ${p.isSitting ? 'translate-y-2 scale-90' : ''}`}>{p.avatar}</div>
@@ -524,7 +524,7 @@
            if (t.type === 'PORTAL') { setZoneId(t.targetZone); handleMove(WORLD_WIDTH/2, WORLD_HEIGHT/2); showNotif(`Entered ${t.label}`); }
            else if (t.type === 'GAME') setGame(t.gameType);
            else if (t.type === 'NPC') showNotif(t.message);
-           else if (t.type === 'CHAIR') { handleMove(t.x, t.y - 10, true); }
+           else if (t.type === 'CHAIR') { handleMove(t.x, t.y - 5, true); }
         };
 
         const sendMsg = (txt) => {
