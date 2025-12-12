@@ -49,6 +49,7 @@
         font-family: 'Mountains of Christmas', cursive;
         text-align: center;
         padding: 20px;
+        transition: opacity 0.5s ease-out;
       }
       
       .loading-title {
@@ -92,7 +93,7 @@
       }
     </style>
 
-    <!-- Import Map: Cleaned up to avoid version conflicts and fix GenAI 404 -->
+    <!-- Import Map -->
     <script type="importmap">
 {
   "imports": {
@@ -106,14 +107,13 @@
 }
 </script>
     
-    <!-- Global Polyfills (if needed by dependencies) -->
     <script>
       window.process = { env: { NODE_ENV: 'production' } };
     </script>
   </head>
   <body>
     <div id="root">
-        <!-- Enhanced Loading Screen Structure -->
+        <!-- Static Loading Screen (Removed by React when ready) -->
         <div id="loading-screen">
             <div class="loading-title animate-float">🎄 Winter Wonderland 🎄</div>
             <div class="loading-progress-container">
@@ -123,7 +123,7 @@
         </div>
     </div>
 
-    <!-- Vanilla JS for Loading Animation (Runs immediately) -->
+    <!-- Vanilla JS for Loading Animation -->
     <script>
       (function() {
         const tips = [
@@ -144,19 +144,18 @@
 
         const progressBar = document.getElementById('progress-bar');
         const loadingText = document.getElementById('loading-text');
+        const loadingScreen = document.getElementById('loading-screen');
         
-        // Progress Bar Animation
         let progress = 0;
-        const totalDuration = 3500; // Fake duration in ms
+        const totalDuration = 3500;
         const intervalTime = 50;
         const increment = 100 / (totalDuration / intervalTime);
         
         const progressInterval = setInterval(() => {
-          progress = Math.min(progress + increment, 95); // Cap at 95% until React loads
+          progress = Math.min(progress + increment, 95); 
           if (progressBar) progressBar.style.width = `${progress}%`;
         }, intervalTime);
 
-        // Tip Rotation
         const tipInterval = setInterval(() => {
           if (loadingText) {
             const randomTip = tips[Math.floor(Math.random() * tips.length)];
@@ -168,11 +167,14 @@
           }
         }, 1200);
 
-        // Cleanup function attached to window so React can call it if needed, 
-        // though React clearing the DOM handles visual cleanup naturally.
-        window.stopLoadingAnimation = () => {
+        window.finishLoading = () => {
           clearInterval(progressInterval);
           clearInterval(tipInterval);
+          if (progressBar) progressBar.style.width = '100%';
+          if (loadingScreen) {
+             loadingScreen.style.opacity = '0';
+             setTimeout(() => loadingScreen.remove(), 500);
+          }
         };
       })();
     </script>
@@ -201,6 +203,9 @@
 
       const WORLD_WIDTH = 1000;
       const WORLD_HEIGHT = 800;
+      const SAVE_KEY = 'winter_wonderland_v1_save';
+
+      const AVATARS = ['🎅', '🧝', '🦌', '⛄', '🤶', '🦊', '🐧', '🐻'];
 
       const ZONES = {
         [ZoneId.TOWN_SQUARE]: {
@@ -239,7 +244,6 @@
 
       // --- SERVICES ---
 
-      // Gemini Service
       const getApiKey = () => {
         if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
             return process.env.API_KEY;
@@ -311,8 +315,7 @@
          }
       }
 
-      // Network Service
-      const ROOM_ID = 'christmas_world_2024_lobby_v3';
+      const ROOM_ID = 'christmas_world_2024_lobby_v4';
       
       class NetworkService {
         constructor() {
@@ -333,7 +336,6 @@
           this.sendScoreAction = sendScore;
 
           this.room.onPeerJoin((peerId) => {
-            console.log(`Peer ${peerId} joined`);
             if (this.onPeerJoined) this.onPeerJoined(peerId);
           });
 
@@ -388,6 +390,64 @@
       }
 
       // --- COMPONENTS ---
+
+      const LoginScreen = ({ onJoin }) => {
+        const [name, setName] = useState("");
+        const [avatarIndex, setAvatarIndex] = useState(0);
+
+        const handleJoin = () => {
+          if (!name.trim()) return;
+          onJoin(name.trim(), AVATARS[avatarIndex]);
+        };
+
+        const changeAvatar = (dir) => {
+          setAvatarIndex(prev => {
+             let next = prev + dir;
+             if (next < 0) next = AVATARS.length - 1;
+             if (next >= AVATARS.length) next = 0;
+             return next;
+          });
+        };
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900 text-white font-christmas">
+            <div className="bg-slate-800 border-4 border-yellow-500 rounded-3xl p-8 max-w-md w-full text-center shadow-[0_0_50px_rgba(234,179,8,0.3)]">
+               <h1 className="text-4xl text-yellow-400 mb-2">Winter Wonderland</h1>
+               <p className="text-gray-300 font-sans mb-8">Enter your details to join the hunt!</p>
+               
+               <div className="mb-6">
+                 <label className="block text-left text-sm text-yellow-200 mb-1 font-sans font-bold ml-1">YOUR AVATAR</label>
+                 <div className="flex items-center justify-center space-x-4 bg-slate-700/50 rounded-xl p-4">
+                    <button onClick={() => changeAvatar(-1)} className="text-3xl hover:scale-125 transition">◀️</button>
+                    <div className="text-6xl animate-bounce filter drop-shadow-lg">{AVATARS[avatarIndex]}</div>
+                    <button onClick={() => changeAvatar(1)} className="text-3xl hover:scale-125 transition">▶️</button>
+                 </div>
+               </div>
+
+               <div className="mb-8">
+                  <label className="block text-left text-sm text-yellow-200 mb-1 font-sans font-bold ml-1">YOUR NAME</label>
+                  <input 
+                    type="text" 
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g. Frosty The Snowman"
+                    className="w-full bg-slate-700 border border-slate-600 rounded-xl px-4 py-3 text-xl focus:outline-none focus:border-yellow-400 text-white font-sans"
+                    maxLength={12}
+                    onKeyDown={(e) => e.key === 'Enter' && handleJoin()}
+                  />
+               </div>
+
+               <button 
+                 onClick={handleJoin}
+                 disabled={!name.trim()}
+                 className={`w-full py-4 rounded-xl text-2xl font-bold shadow-lg transition transform ${!name.trim() ? 'bg-gray-600 opacity-50 cursor-not-allowed' : 'bg-red-600 hover:bg-red-500 hover:scale-105 shadow-red-900/50'}`}
+               >
+                 ENTER WORLD 🎄
+               </button>
+            </div>
+          </div>
+        );
+      };
 
       const Leaderboard = ({ players }) => {
         const sortedPlayers = [...players].sort((a, b) => b.score - a.score);
@@ -720,53 +780,125 @@
       const App = () => {
         const networkRef = useRef(null);
         const playerRef = useRef(null);
+        
+        // --- Persistence Logic ---
+        const loadSavedData = () => {
+          try {
+            const saved = localStorage.getItem(SAVE_KEY);
+            return saved ? JSON.parse(saved) : null;
+          } catch (e) { return null; }
+        };
+
+        const [gameState, setGameState] = useState('LOADING'); // LOADING -> LOGIN -> PLAYING
         const [player, setPlayer] = useState({
           id: 'init', 
-          name: 'Elf_' + Math.floor(Math.random() * 900 + 100),
+          name: 'Player',
           score: 0,
           isCurrentUser: true,
-          avatar: ['🎅', '🧝', '🦌', '⛄', '🤶'][Math.floor(Math.random() * 5)],
-          x: WORLD_WIDTH / 2 + (Math.random() * 100 - 50),
-          y: WORLD_HEIGHT / 2 + (Math.random() * 100 - 50)
+          avatar: '🎅',
+          x: WORLD_WIDTH / 2,
+          y: WORLD_HEIGHT / 2
         });
         
-        useEffect(() => { playerRef.current = player; }, [player]);
-        const [currentZoneId, setCurrentZoneId] = useState(ZoneId.TOWN_SQUARE);
         const [easterEggs, setEasterEggs] = useState(HIDDEN_EGGS);
+        const [currentZoneId, setCurrentZoneId] = useState(ZoneId.TOWN_SQUARE);
         const [otherPlayers, setOtherPlayers] = useState([]);
         const [messages, setMessages] = useState([]);
         const [activeMiniGame, setActiveMiniGame] = useState(null);
         const [notification, setNotification] = useState(null);
 
+        // --- Save System ---
         useEffect(() => {
+          if (gameState === 'PLAYING' && player.id !== 'init') {
+            const dataToSave = {
+              name: player.name,
+              score: player.score,
+              avatar: player.avatar,
+              foundEggIds: easterEggs.filter(e => e.found).map(e => e.id)
+            };
+            localStorage.setItem(SAVE_KEY, JSON.stringify(dataToSave));
+          }
+        }, [player.score, player.name, player.avatar, easterEggs, gameState]);
+
+        // --- Init ---
+        useEffect(() => {
+          // Finish CSS loading screen logic
+          if (window.finishLoading) window.finishLoading();
+
+          const saved = loadSavedData();
+          if (saved) {
+             // Auto-restore
+             setPlayer(prev => ({ 
+               ...prev, 
+               name: saved.name, 
+               score: saved.score, 
+               avatar: saved.avatar 
+             }));
+             // Restore Eggs
+             setEasterEggs(prev => prev.map(egg => ({
+                ...egg,
+                found: saved.foundEggIds?.includes(egg.id) || false
+             })));
+             
+             showNotification(`Welcome back, ${saved.name}!`);
+             initNetwork();
+             setGameState('PLAYING');
+          } else {
+             setGameState('LOGIN');
+          }
+        }, []);
+
+        const initNetwork = () => {
           const net = new NetworkService();
           networkRef.current = net;
-          setPlayer(p => ({ ...p, id: net.getMyId() }));
-          setTimeout(() => { if (playerRef.current) net.broadcastMove(playerRef.current); }, 1000);
+          // Set real ID provided by network
+          setPlayer(p => {
+             const updated = { ...p, id: net.getMyId() };
+             playerRef.current = updated;
+             return updated;
+          });
           
+          setTimeout(() => { if (playerRef.current) net.broadcastMove(playerRef.current); }, 1000);
+
           net.onPlayerMoved = (remotePlayer) => {
             setOtherPlayers(prev => {
               const idx = prev.findIndex(p => p.id === remotePlayer.id);
               if (idx >= 0) {
                 const updated = [...prev];
-                updated[idx] = { ...updated[idx], x: remotePlayer.x, y: remotePlayer.y, score: remotePlayer.score, name: remotePlayer.name, avatar: remotePlayer.avatar };
+                updated[idx] = { ...updated[idx], ...remotePlayer };
                 return updated;
               } else { return [...prev, remotePlayer]; }
             });
           };
-          net.onPeerJoined = (peerId) => {
-            if (playerRef.current) net.broadcastMove(playerRef.current);
-            showNotification("A new player has entered!");
+          net.onPeerJoined = () => {
+             if (playerRef.current) net.broadcastMove(playerRef.current);
+             showNotification("A new elf has joined!");
           };
-          net.onPlayerLeft = (peerId) => setOtherPlayers(prev => prev.filter(p => p.id !== peerId));
+          net.onPlayerLeft = (pid) => setOtherPlayers(prev => prev.filter(p => p.id !== pid));
           net.onChatMessage = (msg) => {
             setMessages(prev => [...prev, msg]);
             setOtherPlayers(prev => prev.map(p => { if (p.id === msg.senderId) return { ...p, currentMessage: msg.text, messageTimer: Date.now() + 5000 }; return p; }));
           };
-          net.onScoreUpdate = (peerId, newScore) => {
-             setOtherPlayers(prev => prev.map(p => { if (p.id === peerId) return { ...p, score: newScore }; return p; }));
-          };
-        }, []);
+          net.onScoreUpdate = (pid, sc) => setOtherPlayers(prev => prev.map(p => { if (p.id === pid) return { ...p, score: sc }; return p; }));
+        };
+
+        const handleLoginJoin = (name, avatar) => {
+           setPlayer(prev => ({ ...prev, name, avatar }));
+           initNetwork();
+           setGameState('PLAYING');
+        };
+
+        useEffect(() => { playerRef.current = player; }, [player]);
+        
+        // Loop for chat bubbles
+        useEffect(() => {
+          const interval = setInterval(() => {
+            const now = Date.now();
+            if (player.messageTimer && now > player.messageTimer) setPlayer(p => ({ ...p, currentMessage: undefined, messageTimer: undefined }));
+            setOtherPlayers(prev => prev.map(p => { if (p.messageTimer && now > p.messageTimer) return { ...p, currentMessage: undefined, messageTimer: undefined }; return p; }));
+          }, 500);
+          return () => clearInterval(interval);
+        }, [player.messageTimer]);
 
         const lastBroadcastRef = useRef(0);
         const handlePlayerMove = (x, y) => {
@@ -780,15 +912,6 @@
             return updated;
           });
         };
-
-        useEffect(() => {
-          const interval = setInterval(() => {
-            const now = Date.now();
-            if (player.messageTimer && now > player.messageTimer) setPlayer(p => ({ ...p, currentMessage: undefined, messageTimer: undefined }));
-            setOtherPlayers(prev => prev.map(p => { if (p.messageTimer && now > p.messageTimer) return { ...p, currentMessage: undefined, messageTimer: undefined }; return p; }));
-          }, 500);
-          return () => clearInterval(interval);
-        }, [player.messageTimer]);
 
         const handleInteract = (target) => {
           if (target.type === 'PORTAL' && target.targetZone) {
@@ -837,6 +960,14 @@
           setNotification(msg);
           setTimeout(() => setNotification(null), 3000);
         };
+
+        if (gameState === 'LOGIN') {
+           return <LoginScreen onJoin={handleLoginJoin} />;
+        }
+
+        if (gameState === 'LOADING') {
+           return null; // Handled by static HTML until ready
+        }
 
         return (
           <div className="w-screen h-screen bg-black overflow-hidden relative font-sans">
