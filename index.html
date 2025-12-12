@@ -7,13 +7,13 @@
     <!-- Favicon -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎄</text></svg>">
     
-    <!-- Tailwind CSS -->
+    <!-- Tailwind CSS (CDN for dev/demo purposes) -->
     <script src="https://cdn.tailwindcss.com"></script>
     
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Mountains+of+Christmas:wght@400;700&family=Nunito:wght@400;600;800&display=swap" rel="stylesheet">
     
-    <!-- Babel for in-browser TSX transpilation (Fixes MIME type errors) -->
+    <!-- Babel for in-browser TSX transpilation -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
     <style>
@@ -35,9 +35,21 @@
         50% { transform: translateY(-10px); }
         100% { transform: translateY(0px); }
       }
+      #loading-screen {
+        position: fixed;
+        inset: 0;
+        background: #0f172a;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 9999;
+        color: #fcd34d;
+        font-family: 'Mountains of Christmas', cursive;
+        font-size: 2rem;
+      }
     </style>
 
-    <!-- Import Map -->
+    <!-- Import Map: Cleaned up to avoid version conflicts -->
     <script type="importmap">
 {
   "imports": {
@@ -50,9 +62,18 @@
   }
 }
 </script>
+    
+    <!-- Global Polyfills (if needed by dependencies) -->
+    <script>
+      window.process = { env: { NODE_ENV: 'production' } };
+    </script>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+        <div id="loading-screen">
+            <div class="animate-bounce">🎄 Loading Winter Wonderland...</div>
+        </div>
+    </div>
 
     <!-- Main Application Code -->
     <script type="text/babel" data-type="module" data-presets="react,typescript">
@@ -117,7 +138,6 @@
       // --- SERVICES ---
 
       // Gemini Service
-      // Note: In this static demo, we check for API key safely.
       const getApiKey = () => {
         if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
             return process.env.API_KEY;
